@@ -2,6 +2,9 @@ package main
 
 import (
 	"fmt"
+	"log"
+	"net"
+	"net/http"
 
 	"github.com/spf13/cobra"
 )
@@ -19,7 +22,12 @@ var rootCmd = &cobra.Command{
 	Version: version,
 	Args:    cobra.ExactArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
-		fmt.Printf("Serving %s on port %d", args[0], port)
+		path := args[0]
+		options := ServeOptions{Port: port}
+
+		if err := serve(path, options); err != nil {
+			panic(err)
+		}
 	},
 }
 
@@ -29,4 +37,23 @@ func init() {
 
 func main() {
 	rootCmd.Execute()
+}
+
+type ServeOptions struct {
+	Port int
+}
+
+func serve(path string, options ServeOptions) error {
+	fs := http.FileServer(http.Dir(path))
+	http.Handle("/", fs)
+
+	listener, err := net.Listen("tcp", fmt.Sprintf(":%d", options.Port))
+	if err != nil {
+		panic(err)
+	}
+
+	defer listener.Close()
+
+	log.Printf("Serving %s on http://localhost:%d\n", path, listener.Addr().(*net.TCPAddr).Port)
+	return http.Serve(listener, nil)
 }
